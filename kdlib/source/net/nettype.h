@@ -143,6 +143,10 @@ protected:
         NOT_IMPLEMENTED();
     }
 
+	virtual void setElementName(size_t index, std::wstring name) {
+		NOT_IMPLEMENTED();
+	}
+
     virtual size_t getElementIndex( const std::wstring &name ) {
         NOT_IMPLEMENTED();
     }

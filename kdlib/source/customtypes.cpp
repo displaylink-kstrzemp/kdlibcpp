@@ -139,9 +139,10 @@ protected:
         return m_callconv;
     }
 
-    virtual void appendField(const std::wstring &fieldName, const TypeInfoPtr &fieldType ) {
-        m_args.push_back(fieldType);
-    }
+  //  virtual void appendField(const std::wstring &fieldName, const TypeInfoPtr &fieldType ) {
+		//m_argsName.push_back (fieldName);
+		//m_args.push_back(fieldType);
+  //  }
 
 };
 

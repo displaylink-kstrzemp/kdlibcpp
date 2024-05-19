@@ -172,6 +172,11 @@ protected:
          NOT_IMPLEMENTED();
     }
 
+	void setElementName(size_t index, std::wstring name) override
+	{
+		NOT_IMPLEMENTED();
+	}
+
     size_t getElementIndex( const std::wstring &name ) override
     {
          NOT_IMPLEMENTED();
@@ -631,10 +636,42 @@ protected:
 
     virtual std::pair<std::wstring, std::wstring> splitName();
 
+	std::wstring getElementName(size_t index) {
+		if (index >= m_argsName.size()) {
+			throw IndexException(index);
+		}
+
+		if (index < m_argsName.size()) {
+			return m_argsName[index];
+		}
+		else {
+			return L"";
+		}
+	}
+
+	void setElementName(size_t index, std::wstring name)
+	{
+		if (index >= m_args.size()) {
+			throw IndexException(index);
+		}
+
+		if (index >= m_argsName.size()) {
+			m_argsName.resize(index + 1);
+		}
+		m_argsName[index] = name;
+	}
+
+	virtual void appendField(const std::wstring &fieldName, const TypeInfoPtr &fieldType) {
+		m_argsName.push_back(fieldName);
+		m_args.push_back(fieldType);
+	}
+
 protected:
 
     typedef std::vector< TypeInfoPtr > Args;
     Args m_args;
+	typedef std::vector<std::wstring> ArgsName;
+	ArgsName m_argsName;
 
     TypeInfoPtr  m_returnType;
 

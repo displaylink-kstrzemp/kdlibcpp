@@ -90,6 +90,7 @@ public:
     virtual MEMOFFSET_REL getElementOffset( const std::wstring &name ) = 0;
     virtual MEMOFFSET_REL getElementOffset( size_t index ) = 0;
     virtual std::wstring getElementName( size_t index ) = 0;
+	virtual void setElementName(size_t index, std::wstring name) = 0;
     virtual size_t getElementIndex( const std::wstring &name ) = 0;
     virtual size_t getElementCount() = 0;
     virtual  MEMOFFSET_64 getElementVa( const std::wstring &name ) = 0;

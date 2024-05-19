@@ -71,14 +71,16 @@ TypeInfoPtr getTypeForClangBuiltinType(const clang::BuiltinType* builtinType)
     case clang::BuiltinType::Bool:
         return loadType(L"Bool");
     case clang::BuiltinType::Char_S:
+	case clang::BuiltinType::Char_U:
         return loadType(L"Char");
     case clang::BuiltinType::WChar_S:
+	case clang::BuiltinType::WChar_U:
         return loadType(L"WChar");
 
     case clang::BuiltinType::UChar:
         return loadType(L"UInt1B");
-    case clang::BuiltinType::WChar_U:
     case clang::BuiltinType::UShort:
+	//case clang::BuiltinType::WChar_U:
         return loadType(L"UInt2B");
     case clang::BuiltinType::UInt:
     case clang::BuiltinType::ULong:
@@ -512,7 +514,13 @@ TypeInfoClangFuncPrototype::TypeInfoClangFuncPrototype(ClangASTSessionPtr& sessi
 
     for (clang::FunctionProtoType::param_type_iterator paramIt = funcProto->param_type_begin(); paramIt != funcProto->param_type_end(); paramIt++)
     {
-        m_args.push_back(getTypeForClangType(session, *paramIt));
+		//std::string stringName = paramIt->getAsString();
+		//std::wstring name (stringName.begin(), stringName.end());
+		//appendField (name, getTypeForClangType(session, *paramIt));
+		std::wstring argName = L"arg";
+		argName += std::to_wstring(getElementCount() + 1);
+		appendField(argName, getTypeForClangType(session, *paramIt));
+		//m_args.push_back (getTypeForClangType(session, *paramIt));
     }
 }
 ///////////////////////////////////////////////////////////////////////////////
