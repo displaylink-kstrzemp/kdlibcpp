@@ -73,8 +73,10 @@ bool isInintilized()
 
 void uninitialize()
 {
-    if ( g_dbgMgr ==  0  )
-         throw DbgException("pykd is not initialized");
+	if (g_dbgMgr == 0) {
+		//throw DbgException("pykd is not initialized");
+		return;
+	}
 
     ClrDebugManager::deinit();
 
