@@ -325,6 +325,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)..\include;$(ProjectDir);"$(VCInstallDir)..\DIA SDK\include";$(VCInstallDir)..\DIA SDK\include</AdditionalIncludeDirectories>
       <DisableLanguageExtensions>false</DisableLanguageExtensions>
       <AdditionalOptions>/Zc:referenceBinding /Zc:rvalueCast %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

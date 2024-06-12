@@ -80,7 +80,8 @@ public:
     virtual void readDoubles( std::vector<double>&  dataRange, size_t count, size_t  pos=0) const = 0;
     virtual void writeDoubles( const std::vector<double>&  dataRange, size_t  pos=0) = 0;
 
-    virtual DataAccessorPtr copy( size_t  startOffset = 0, size_t  length = -1 ) = 0;
+    virtual DataAccessorPtr nestedCopy( size_t  startOffset = 0, size_t  length = -1 ) = 0;
+	virtual DataAccessorPtr externalCopy(size_t  startOffset = 0, size_t  length = -1) = 0;
 
     virtual std::wstring getLocationAsStr() const = 0;
 
@@ -99,6 +100,10 @@ DataAccessorPtr getCacheAccessor(const std::vector<char>& buffer, const std::wst
 DataAccessorPtr getCacheAccessor(size_t bufferSize, const std::wstring&  location=L"");
 DataAccessorPtr getCacheAccessor(const void* rawBuffer, size_t bufferSize, const std::wstring&  location=L"");
 DataAccessorPtr getCacheAccessor(const NumVariant& var, const std::wstring&  location=L"");
+
+DataAccessorPtr getDumpAccessor(const std::vector<unsigned char>& buffer, MEMOFFSET_64 addr = 0, const std::wstring& location = L"");
+DataAccessorPtr getDumpAccessor(size_t size, MEMOFFSET_64 addr = 0, const std::wstring& location = L"");
+DataAccessorPtr getDumpAccessor(const NumVariant& var, MEMOFFSET_64 addr = 0, const std::wstring&  location = L"");
 
 template<typename T, typename std::enable_if< !std::is_integral<T>::value >::type* = nullptr >
 DataAccessorPtr getCacheAccessor(const T& structType, const std::wstring&  location=L"")

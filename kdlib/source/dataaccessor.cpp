@@ -56,4 +56,26 @@ DataAccessorPtr getCacheAccessor(const NumVariant& var, const std::wstring&  loc
 
 ///////////////////////////////////////////////////////////////////////////////
 
+DataAccessorPtr getDumpAccessor(const std::vector<unsigned char>& buffer, MEMOFFSET_64 addr, const std::wstring& location)
+{
+	return DataAccessorPtr(new DumpAccessor(buffer, addr, location));
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataAccessorPtr getDumpAccessor(size_t size, MEMOFFSET_64 addr, const std::wstring& location)
+{
+	return DataAccessorPtr(new DumpAccessor(size, addr, location));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+DataAccessorPtr getDumpAccessor(const NumVariant& var, MEMOFFSET_64 addr, const std::wstring&  location)
+{
+	return DataAccessorPtr(new DumpAccessor(var, addr, location));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+}	// namespace kdlib

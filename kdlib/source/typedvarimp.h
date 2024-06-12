@@ -58,6 +58,7 @@ protected:
     MEMOFFSET_64 getAddress() const override
     {
         return m_varData->getAddress();
+		//return m_addr;
     }
 
     MEMOFFSET_64 getDebugStart() const override
@@ -216,6 +217,8 @@ protected:
     DataAccessorPtr  m_varData;
 
     std::wstring  m_name;
+
+	//MEMOFFSET_64 m_addr;
 };
 
 ///////////////////////////////////////////////////////////////////////////////

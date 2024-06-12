@@ -986,7 +986,7 @@ TypedVarPtr TypedVarUdt::getElement(const std::wstring& fieldName)
         fieldOffset += getVirtualBaseDisplacement(fieldName);
     }
 
-    return  loadTypedVar(fieldType, m_varData->copy(fieldOffset, fieldType->getSize()));
+    return  loadTypedVar(fieldType, m_varData->nestedCopy(fieldOffset, fieldType->getSize()));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1021,7 +1021,7 @@ TypedVarPtr TypedVarUdt::getElement( size_t index )
         fieldOffset += getVirtualBaseDisplacement( index );
     }
 
-    return  loadTypedVar( fieldType, m_varData->copy(fieldOffset, fieldType->getSize()) );
+    return  loadTypedVar( fieldType, m_varData->nestedCopy(fieldOffset, fieldType->getSize()) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1075,6 +1075,7 @@ std::wstring TypedVarUdt::str()
     std::wstringstream  sstr;
 
     sstr << L"struct/class: " << m_typeInfo->getName() << L" at " <<  m_varData->getLocationAsStr() << std::endl;
+	sstr << L"0x" << std::setfill(L'0') << std::setw(16) << std::hex << getAddress() << L":" << std::endl;
     
     for ( size_t i = 0; i < m_typeInfo->getElementCount(); ++i )
     {
@@ -1104,7 +1105,7 @@ std::wstring TypedVarUdt::str()
                 fieldOffset += getVirtualBaseDisplacement(i);
             }
 
-            fieldVar = loadTypedVar( fieldType, m_varData->copy(fieldOffset, fieldType->getSize()) );
+            fieldVar = loadTypedVar( fieldType, m_varData->nestedCopy(fieldOffset, fieldType->getSize()) );
             sstr << L"   +" << std::right << std::setw(4) << std::setfill(L'0') << std::hex << fieldOffset;
             sstr << L" " << std::left << std::setw(24) << std::setfill(L' ') << m_typeInfo->getElementName(i) << ':';
         }
@@ -1126,7 +1127,10 @@ std::wstring TypedVarUdt::str()
 
 TypedVarPtr TypedVarPointer::deref()
 {
-    return loadTypedVar( m_typeInfo->deref(), getPtrValue());
+    //return loadTypedVar( m_typeInfo->deref(), getPtrValue());
+	//return loadGeneralTypedVar(m_typeInfo->deref(), getPtrValue(), m_varData);
+	const TypeInfoPtr &varType = m_typeInfo->deref();
+	return loadTypedVar(varType, m_varData->externalCopy(getPtrValue(), varType->getSize()));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1183,7 +1187,7 @@ TypedVarPtr TypedVarArray::getElement( size_t index )
     if ( index >= m_typeInfo->getElementCount() )
         throw IndexException( index );
 
-    return loadTypedVar( elementType,  m_varData->copy(elementType->getSize()*index, elementType->getSize()) );
+    return loadTypedVar( elementType,  m_varData->nestedCopy(elementType->getSize()*index, elementType->getSize()) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////

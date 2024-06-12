@@ -28,13 +28,13 @@ typedef boost::shared_ptr<Scope>  ScopePtr;
 
 ///////////////////////////////////////////////////////////////////////////////
 
+TypedVarPtr loadTypedVar(SymbolPtr &symbol);
+
 TypedVarPtr loadTypedVar( const std::wstring &varName );
 
 TypedVarPtr loadTypedVar( const std::wstring &typeName, MEMOFFSET_64 addr );
 
 TypedVarPtr loadTypedVar( const TypeInfoPtr &typeInfo, MEMOFFSET_64 addr );
-
-TypedVarPtr loadTypedVar( SymbolPtr &symbol );
 
 TypedVarPtr loadTypedVar( const std::wstring &typeName, const DataAccessorPtr& dataSource);
 
