@@ -19,7 +19,7 @@
 #include "kdlib/exceptions.h"
 
 #include "evalexpr.h"
-#include "strconvert.h"
+#include "kdlib/strconvert.h"
 #include "exprparser.h"
 
 namespace kdlib {

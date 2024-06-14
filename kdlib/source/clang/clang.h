@@ -359,7 +359,6 @@ protected:
 };
 
 
-
 class TypeInfoProviderClangEnum  : public TypeInfoEnumerator {
 
 public:
@@ -384,7 +383,7 @@ class TypeInfoProviderClang : public TypeInfoProvider, public boost::enable_shar
 
 public:
 
-    TypeInfoProviderClang( const std::string&  sourceCode, const std::string&  compileOptions);
+    TypeInfoProviderClang( const std::string&  sourceCode, std::string &errorOutput, const std::string&  compileOptions);
 
 private:
 
@@ -413,7 +412,7 @@ public:
 
     friend SymbolEnumeratorClang;
 
-    SymbolProviderClang(const std::string&  sourceCode, const std::string&  compileOptions);
+    SymbolProviderClang(const std::string&  sourceCode, std::string &errorOutput, const std::string&  compileOptions);
 
 private:
 

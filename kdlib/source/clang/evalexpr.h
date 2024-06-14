@@ -4,8 +4,8 @@
 
 #include "kdlib/typedvar.h"
 #include "kdlib/exceptions.h"
+#include "kdlib/strconvert.h"
 
-#include "strconvert.h"
 #include "typeparser.h"
 #include "exprparser.h"
 

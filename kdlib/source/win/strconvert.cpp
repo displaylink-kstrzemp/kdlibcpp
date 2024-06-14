@@ -1,6 +1,6 @@
 #include "stdafx.h"
 
-#include "strconvert.h"
+#include "kdlib/strconvert.h"
 
 
 #include <comutil.h>

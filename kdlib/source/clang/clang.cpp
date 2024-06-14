@@ -14,13 +14,18 @@
 #include "clang/Parse/ParseAST.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Driver/Driver.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include "kdlib/typeinfo.h"
 #include "kdlib/exceptions.h"
 
-#include "strconvert.h"
+#include "kdlib/strconvert.h"
+
 #include "clang.h"
 #include "fnmatch.h"
+
+#include "io.h"
+#include "fcntl.h"
 
 using namespace clang;
 using namespace clang::tooling;
@@ -770,7 +775,63 @@ size_t ClangASTSession::getPtrSize()
 
 TypeInfoPtr compileType( const std::wstring& sourceCode, const std::wstring& typeName, const std::wstring& options)
 {
-    return getTypeInfoProviderFromSource(sourceCode, options)->getTypeByName(typeName);
+	std::string errorOptput;
+    return getTypeInfoProviderFromSource(sourceCode, errorOptput, options)->getTypeByName(typeName);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+class CompilationErrorCatcher {
+
+public:
+
+	CompilationErrorCatcher(std::string &errorOutput, size_t m_bufferSize = 0x1000);
+
+	~CompilationErrorCatcher();
+
+private:
+
+	using StreamType = llvm::raw_fd_ostream;
+
+	std::string &m_errorOutput;
+	size_t m_bufferSize;
+	std::vector<unsigned char> m_saveErr;
+	int m_fds[2];
+
+};
+
+
+CompilationErrorCatcher::CompilationErrorCatcher(std::string &errorOutput, size_t bufferSize) :
+	m_errorOutput(errorOutput), m_bufferSize(bufferSize), m_saveErr(sizeof(StreamType))
+{
+	_pipe(m_fds, m_bufferSize, _O_BINARY);
+	StreamType newErr(m_fds[1], false, true);
+
+	memcpy(&m_saveErr[0], &static_cast<StreamType&>(llvm::errs()), sizeof(StreamType));
+	memcpy(&static_cast<StreamType&>(llvm::errs()), &newErr, sizeof(StreamType));
+}
+
+
+CompilationErrorCatcher::~CompilationErrorCatcher()
+{
+	static_cast<StreamType&>(llvm::errs()).clear_error();
+	llvm::errs().flush();
+	memcpy(&static_cast<StreamType&>(llvm::errs()), &m_saveErr[0], sizeof(StreamType));
+
+	//_write(m_fds[1], "\n", 1);
+	_close(m_fds[1]);
+
+	m_errorOutput.resize(m_bufferSize);
+	int err = _read(m_fds[0], &m_errorOutput[0], m_bufferSize);
+	if (err > 1) {
+		m_errorOutput.resize(err);
+	}
+	else {
+		m_errorOutput.resize(0);
+	}
+
+	_close(m_fds[0]);
+
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -801,7 +862,8 @@ public:
     }
 };
 
-TypeInfoProviderClang::TypeInfoProviderClang( const std::string& sourceCode, const std::string& compileOptions)
+
+TypeInfoProviderClang::TypeInfoProviderClang( const std::string& sourceCode, std::string &errorOutput, const std::string& compileOptions)
 {
     std::vector<std::unique_ptr<ASTUnit>> ASTs;
     ASTBuilderAction Action(ASTs);
@@ -817,6 +879,7 @@ TypeInfoProviderClang::TypeInfoProviderClang( const std::string& sourceCode, con
 
     args.push_back("clang-tool");
     args.push_back("-fsyntax-only");
+	//args.push_back("-w");
 
     typedef boost::tokenizer< boost::escaped_list_separator<char> > Tokenizer;
     boost::escaped_list_separator<char> Separator('\\', ' ', '\"');
@@ -844,15 +907,43 @@ TypeInfoProviderClang::TypeInfoProviderClang( const std::string& sourceCode, con
 
 #endif
 
-    toolInvocation.run();
+	/*
+	//InMemoryFileSystem->addFile("clang_compile_diag.txt", 0, llvm::MemoryBuffer::getMemBuffer(nullptr));
 
-    std::unique_ptr<ASTUnit>  ast = std::move(ASTs[0]);
+	int fds[2];
+	_pipe(fds, 0x1000, _O_BINARY);
+	std::error_code ec;
+	//llvm::raw_fd_ostream *newErr = new llvm::raw_fd_ostream(llvm::StringRef("I:\\clang_compile_diag.txt"), ec, llvm::sys::fs::F_RW);
+	llvm::raw_fd_ostream *newErr = new llvm::raw_fd_ostream(fds[1], false, true);
+	//static_cast<llvm::raw_fd_ostream&>(llvm::errs()) = *newErr;
+	memcpy(&static_cast<llvm::raw_fd_ostream&>(llvm::errs()), newErr, sizeof(llvm::raw_fd_ostream));
+	//*/
 
-    m_astSession = ClangASTSession::getASTSession(ast);
+	CompilationErrorCatcher errorCatcher(errorOutput);
 
-    DeclNextVisitor   visitor(m_astSession, &m_typeCache);
+	toolInvocation.run();
 
-    visitor.TraverseDecl( m_astSession->getASTContext().getTranslationUnitDecl() );
+	std::unique_ptr<ASTUnit>  ast = std::move(ASTs[0]);
+
+	m_astSession = ClangASTSession::getASTSession(ast);
+
+	DeclNextVisitor   visitor(m_astSession, &m_typeCache);
+
+	visitor.TraverseDecl(m_astSession->getASTContext().getTranslationUnitDecl());
+	
+
+	/*
+	static_cast<llvm::raw_fd_ostream&>(llvm::errs()).clear_error();
+
+	errorOutput.resize(0x1000);
+	int err = _read(fds[0], &errorOutput[0], 0x1000);
+	if (err > 0) {
+		errorOutput.resize(err);
+	}
+	else {
+		errorOutput.resize(0);
+	}
+	//*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -918,21 +1009,21 @@ TypeInfoPtr TypeInfoProviderClangEnum::Next()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TypeInfoProviderPtr  getTypeInfoProviderFromSource( const std::wstring&  source, const std::wstring&  opts )
+TypeInfoProviderPtr  getTypeInfoProviderFromSource( const std::wstring&  source, std::string &errorOutput, const std::wstring&  opts )
 {
-    return TypeInfoProviderPtr( new TypeInfoProviderClang(wstrToStr(source), wstrToStr(opts) ) );
+    return TypeInfoProviderPtr( new TypeInfoProviderClang(wstrToStr(source), errorOutput, wstrToStr(opts) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-TypeInfoProviderPtr  getTypeInfoProviderFromSource(const std::string&  source, const std::string&  opts)
+TypeInfoProviderPtr  getTypeInfoProviderFromSource(const std::string&  source, std::string &errorOutput, const std::string&  opts)
 {
-    return TypeInfoProviderPtr(new TypeInfoProviderClang(source, opts));
+    return TypeInfoProviderPtr(new TypeInfoProviderClang(source, errorOutput, opts));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SymbolProviderClang::SymbolProviderClang(const std::string&  sourceCode, const std::string&  compileOptions)
+SymbolProviderClang::SymbolProviderClang(const std::string&  sourceCode, std::string &errorOutput, const std::string&  compileOptions)
 {
     std::vector<std::unique_ptr<ASTUnit>> ASTs;
     ASTBuilderAction Action(ASTs);
@@ -975,6 +1066,8 @@ SymbolProviderClang::SymbolProviderClang(const std::string&  sourceCode, const s
 
 #endif
 
+	CompilationErrorCatcher errorCatcher(errorOutput);
+
     toolInvocation.run();
 
     std::unique_ptr<ASTUnit>  ast = std::move(ASTs[0]);
@@ -1010,6 +1103,7 @@ bool SymbolEnumeratorClang::Next()
 
     return false;
 }
+
 ///////////////////////////////////////////////////////////////////////////////
 
 std::wstring SymbolEnumeratorClang::getName()
@@ -1033,16 +1127,16 @@ TypeInfoPtr SymbolEnumeratorClang::getType()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SymbolProviderPtr getSymbolProviderFromSource(const std::wstring& source, const std::wstring&  opts)
+SymbolProviderPtr getSymbolProviderFromSource(const std::wstring& source, std::string &errorOutput, const std::wstring&  opts)
 {
-    return SymbolProviderPtr( new SymbolProviderClang(wstrToStr(source), wstrToStr(opts) ) );
+    return SymbolProviderPtr( new SymbolProviderClang(wstrToStr(source), errorOutput, wstrToStr(opts) ) );
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-SymbolProviderPtr getSymbolProviderFromSource(const std::string& source, const std::string&  opts)
+SymbolProviderPtr getSymbolProviderFromSource(const std::string& source, std::string &errorOutput, const std::string&  opts)
 {
-    return SymbolProviderPtr(new SymbolProviderClang(source, opts));
+    return SymbolProviderPtr(new SymbolProviderClang(source, errorOutput, opts));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -210,13 +210,13 @@ public:
     virtual TypeInfoPtr getType() = 0;
 };
 
-TypeInfoProviderPtr  getTypeInfoProviderFromSource( const std::wstring&  source, const std::wstring&  opts = L"" );
-TypeInfoProviderPtr  getTypeInfoProviderFromSource(const std::string&  source, const std::string&  opts = "");
+TypeInfoProviderPtr  getTypeInfoProviderFromSource( const std::wstring&  source, std::string &errorOutput, const std::wstring&  opts = L"" );
+TypeInfoProviderPtr  getTypeInfoProviderFromSource(const std::string&  source, std::string &errorOutput, const std::string&  opts = "");
 TypeInfoProviderPtr  getTypeInfoProviderFromPdb( const std::wstring&  pdbFile, MEMOFFSET_64  loadBase = 0 );
 TypeInfoProviderPtr  getDefaultTypeInfoProvider();
 
-SymbolProviderPtr  getSymbolProviderFromSource(const std::wstring& source, const std::wstring&  opts = L"");
-SymbolProviderPtr  getSymbolProviderFromSource(const std::string& source, const std::string&  opts = "");
+SymbolProviderPtr  getSymbolProviderFromSource(const std::wstring& source, std::string &errorOutput, const std::wstring&  opts = L"");
+SymbolProviderPtr  getSymbolProviderFromSource(const std::string& source, std::string &errorOutput, const std::string&  opts = "");
 
 ///////////////////////////////////////////////////////////////////////////////
 
