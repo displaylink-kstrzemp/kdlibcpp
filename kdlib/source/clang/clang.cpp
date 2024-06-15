@@ -795,20 +795,20 @@ private:
 
 	std::string &m_errorOutput;
 	size_t m_bufferSize;
-	std::vector<unsigned char> m_saveErr;
+	//std::vector<unsigned char> m_saveErr;
 	int m_fds[2];
+	int m_tmpFd;
 
 };
 
 
 CompilationErrorCatcher::CompilationErrorCatcher(std::string &errorOutput, size_t bufferSize) :
-	m_errorOutput(errorOutput), m_bufferSize(bufferSize), m_saveErr(sizeof(StreamType))
+	m_errorOutput(errorOutput), m_bufferSize(bufferSize)
 {
 	_pipe(m_fds, m_bufferSize, _O_BINARY);
 	StreamType newErr(m_fds[1], false, true);
-
-	memcpy(&m_saveErr[0], &static_cast<StreamType&>(llvm::errs()), sizeof(StreamType));
-	memcpy(&static_cast<StreamType&>(llvm::errs()), &newErr, sizeof(StreamType));
+	m_tmpFd = dup(2);
+	dup2(m_fds[1], 2);
 }
 
 
@@ -816,13 +816,14 @@ CompilationErrorCatcher::~CompilationErrorCatcher()
 {
 	static_cast<StreamType&>(llvm::errs()).clear_error();
 	llvm::errs().flush();
-	memcpy(&static_cast<StreamType&>(llvm::errs()), &m_saveErr[0], sizeof(StreamType));
 
 	//_write(m_fds[1], "\n", 1);
-	_close(m_fds[1]);
+	close(m_fds[1]);
+	dup2(m_tmpFd, 2);
+	close(m_tmpFd);
 
 	m_errorOutput.resize(m_bufferSize);
-	int err = _read(m_fds[0], &m_errorOutput[0], m_bufferSize);
+	int err = read(m_fds[0], &m_errorOutput[0], m_bufferSize);
 	if (err > 1) {
 		m_errorOutput.resize(err);
 	}
@@ -830,7 +831,7 @@ CompilationErrorCatcher::~CompilationErrorCatcher()
 		m_errorOutput.resize(0);
 	}
 
-	_close(m_fds[0]);
+	close(m_fds[0]);
 
 }
 
@@ -899,27 +900,16 @@ TypeInfoProviderClang::TypeInfoProviderClang( const std::string& sourceCode, std
 
     InMemoryFileSystem->addFile("input.cc", 0, llvm::MemoryBuffer::getMemBuffer(sourceCode.c_str()));
 
-#ifndef _DEBUG
+//#ifndef _DEBUG
+//
+//    IgnoringDiagConsumer   diagnosticConsumer;
+//
+//    toolInvocation.setDiagnosticConsumer(&diagnosticConsumer);
+//
+//#endif
 
-    IgnoringDiagConsumer   diagnosticConsumer;
 
-    toolInvocation.setDiagnosticConsumer(&diagnosticConsumer);
-
-#endif
-
-	/*
-	//InMemoryFileSystem->addFile("clang_compile_diag.txt", 0, llvm::MemoryBuffer::getMemBuffer(nullptr));
-
-	int fds[2];
-	_pipe(fds, 0x1000, _O_BINARY);
-	std::error_code ec;
-	//llvm::raw_fd_ostream *newErr = new llvm::raw_fd_ostream(llvm::StringRef("I:\\clang_compile_diag.txt"), ec, llvm::sys::fs::F_RW);
-	llvm::raw_fd_ostream *newErr = new llvm::raw_fd_ostream(fds[1], false, true);
-	//static_cast<llvm::raw_fd_ostream&>(llvm::errs()) = *newErr;
-	memcpy(&static_cast<llvm::raw_fd_ostream&>(llvm::errs()), newErr, sizeof(llvm::raw_fd_ostream));
-	//*/
-
-	CompilationErrorCatcher errorCatcher(errorOutput);
+	volatile CompilationErrorCatcher errorCatcher(errorOutput);
 
 	toolInvocation.run();
 
@@ -931,19 +921,6 @@ TypeInfoProviderClang::TypeInfoProviderClang( const std::string& sourceCode, std
 
 	visitor.TraverseDecl(m_astSession->getASTContext().getTranslationUnitDecl());
 	
-
-	/*
-	static_cast<llvm::raw_fd_ostream&>(llvm::errs()).clear_error();
-
-	errorOutput.resize(0x1000);
-	int err = _read(fds[0], &errorOutput[0], 0x1000);
-	if (err > 0) {
-		errorOutput.resize(err);
-	}
-	else {
-		errorOutput.resize(0);
-	}
-	//*/
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1058,13 +1035,13 @@ SymbolProviderClang::SymbolProviderClang(const std::string&  sourceCode, std::st
 
     InMemoryFileSystem->addFile("input.cc", 0, llvm::MemoryBuffer::getMemBuffer(sourceCode.c_str()));
 
-#ifndef _DEBUG
-
-    IgnoringDiagConsumer   diagnosticConsumer;
-
-    toolInvocation.setDiagnosticConsumer(&diagnosticConsumer);
-
-#endif
+//#ifndef _DEBUG
+//
+//    IgnoringDiagConsumer   diagnosticConsumer;
+//
+//    toolInvocation.setDiagnosticConsumer(&diagnosticConsumer);
+//
+//#endif
 
 	CompilationErrorCatcher errorCatcher(errorOutput);
 
