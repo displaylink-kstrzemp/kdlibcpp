@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <algorithm>
 
 #include <boost/shared_ptr.hpp>
 
@@ -81,13 +82,29 @@ public:
     virtual void writeDoubles( const std::vector<double>&  dataRange, size_t  pos=0) = 0;
 
     virtual DataAccessorPtr nestedCopy( size_t  startOffset = 0, size_t  length = -1 ) = 0;
-	virtual DataAccessorPtr externalCopy(size_t  startOffset = 0, size_t  length = -1) = 0;
+	virtual DataAccessorPtr externalCopy(MEMOFFSET_64  startAddr = 0, size_t  length = -1) = 0;
 
     virtual std::wstring getLocationAsStr() const = 0;
 
     virtual MEMOFFSET_64 getAddress() const = 0;
     virtual VarStorage getStorageType() const = 0;
     virtual std::wstring getRegisterName() const = 0;
+
+	virtual bool checkRange(MEMOFFSET_64 startAddr, size_t length) const = 0;
+
+	bool isRangeInside(MEMOFFSET_64 existRangeOffset, size_t existRangeLength, MEMOFFSET_64 newRangeOffset, size_t newRangeLength) const
+	{
+		MEMOFFSET_64 existRightBoundary = existRangeOffset + existRangeLength - 1;
+		MEMOFFSET_64 newRightBoundary = newRangeOffset + newRangeLength - 1;
+		if (std::clamp(newRangeOffset, existRangeOffset, existRightBoundary) != newRangeOffset ||
+			std::clamp(newRightBoundary, existRangeOffset, existRightBoundary) != newRightBoundary) {
+			return false;
+		}
+		else
+		{
+			return true;
+		}
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -110,6 +127,37 @@ DataAccessorPtr getCacheAccessor(const T& structType, const std::wstring&  locat
 {
     return getCacheAccessor(&structType, sizeof(structType), location);
 }
+
+///////////////////////////////////////////////////////////////////////////////
+
+class DataAccessorWrapper;
+typedef boost::shared_ptr<DataAccessorWrapper> DataAccessorWrapperPtr;
+
+class DataAccessorWrapper: public NumConvertable, private boost::noncopyable {
+public:
+
+	DataAccessorWrapper() {}
+	~DataAccessorWrapper() {}
+
+	DataAccessorWrapper (DataAccessorPtr ptr) : m_dataAccessor(ptr) {}
+
+	DataAccessorPtr get() {
+		return m_dataAccessor;
+	}
+
+	virtual kdlib::NumVariant getValue()  const {
+		return kdlib::NumVariant(static_cast<const void*>(m_dataAccessor.get()));
+	}
+
+	DataAccessorWrapperPtr nestedCopy(size_t  startOffset = 0, size_t  length = -1) {
+		return DataAccessorWrapperPtr(
+			new DataAccessorWrapper(m_dataAccessor->nestedCopy(startOffset, length)));
+	}
+
+private:
+	DataAccessorPtr m_dataAccessor;
+};
+
 
 
 ///////////////////////////////////////////////////////////////////////////////

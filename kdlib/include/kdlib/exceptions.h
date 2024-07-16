@@ -11,6 +11,20 @@ namespace kdlib {
 
 ///////////////////////////////////////////////////////////////////////////////
 
+
+template <typename ... Args>
+std::string StringPrintf (const char * const format, Args const & ... args)
+{
+	std::string retStr;
+	const size_t size = snprintf (nullptr, 0, format, args ...);
+	retStr.resize(size);
+	snprintf (&retStr[0], retStr.size() + 1, format, args ...);
+
+	return retStr;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
 class DbgException : public std::exception
 {
 public:
@@ -19,6 +33,31 @@ public:
         std::exception( desc.c_str() )
         {}
 
+	template<typename... Args>
+	DbgException(const char *format, Args... args) :
+		DbgException(StringPrintf(format, args...)){}
+
+	template<typename... Args>
+	DbgException(Args... args) :
+		DbgException(CreateErrMsg(args...).str()) {}
+
+private:
+	template <typename... Args>
+	std::ostringstream CreateErrMsg(Args... args) {
+		std::ostringstream errMsg;
+		CreateErrMsg(errMsg, args...);
+		return errMsg;
+	}
+
+	template<typename A, typename... Args>
+	void CreateErrMsg(std::ostringstream &errMsg, A a, Args... args) {
+		errMsg << a;
+		CreateErrMsg(errMsg, args...);
+	}
+	template<typename A>
+	void CreateErrMsg(std::ostringstream &errMsg, A a) {
+		errMsg << a;
+	}
 };
 
 ///////////////////////////////////////////////////////////////////////////////

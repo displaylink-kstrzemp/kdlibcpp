@@ -251,7 +251,12 @@ private:
         throw DbgException("data accessor no data");
     }
 
-	DataAccessorPtr externalCopy(size_t startOffset = 0, size_t length = 0) override
+	DataAccessorPtr externalCopy(MEMOFFSET_64 startAddr = 0, size_t length = 0) override
+	{
+		throw DbgException("data accessor no data");
+	}
+
+	virtual bool checkRange(MEMOFFSET_64 startAddr, size_t length) const
 	{
 		throw DbgException("data accessor no data");
 	}
@@ -609,9 +614,14 @@ private:
         return getMemoryAccessor( m_begin + startOffset, length);
     }
 
-	DataAccessorPtr externalCopy(size_t startOffset = 0, size_t length = -1) override
+	DataAccessorPtr externalCopy(MEMOFFSET_64 startAddr = 0, size_t length = -1) override
 	{
-		return getMemoryAccessor(startOffset, length);
+		return getMemoryAccessor(startAddr, length);
+	}
+
+	virtual bool checkRange(MEMOFFSET_64 startAddr, size_t length) const
+	{
+		return isRangeInside (m_begin, m_length, startAddr, length);
 	}
 
 private:
@@ -627,16 +637,19 @@ class CopyAccessor : public EmptyAccessor
 {
 public:
 
-    CopyAccessor(const DataAccessorPtr& dataAccessor, size_t pos, size_t length) 
+    CopyAccessor(const DataAccessorPtr& dataAccessor, MEMOFFSET_64 startOffset, size_t length)
     {
-        if ( dataAccessor->getLength() <= pos )
-            throw DbgException("data accessor range error");
+		if (!dataAccessor->checkRange(startOffset, length)) {
+			throw DbgException("CopyAccessor start range error %p %x", startOffset, length);
+		}
+        //if ( dataAccessor->getLength() <= startOffset)
+        //    throw DbgException("CopyAccessor start offset error");
 
-        if ( dataAccessor->getLength() - pos < length )
-            throw DbgException("data accessor range error");
+        //if ( dataAccessor->getLength() - startOffset < length )
+        //    throw DbgException("CopyAccessor length error");
 
         m_parentAccessor = dataAccessor;
-        m_pos = pos;
+        m_pos = startOffset;
         m_length = length;
     }
 
@@ -880,21 +893,27 @@ private:
             throw DbgException("copy accessor range error");
 
         return DataAccessorPtr( new CopyAccessor( m_parentAccessor, m_pos + startOffset, length) );
+        //return m_parentAccessor->nestedCopy (m_pos + startOffset, length);
     }
 
-	DataAccessorPtr externalCopy(size_t startOffset = 0, size_t length = -1) final
+	DataAccessorPtr externalCopy(MEMOFFSET_64 startAddr = 0, size_t length = -1) final
 	{
-		size_t parentAccessorLength = m_parentAccessor->getLength();
-		if (startOffset >= parentAccessorLength)
-			throw DbgException("copy accessor range error");
+		//size_t parentAccessorLength = m_parentAccessor->getLength();
+		//size_t parentAccessorAddr = m_parentAccessor->getAddress();
+		//if (startAddr < parentAccessorAddr) {
+		//	throw DbgException("copy accessor startAddr error");
+		//}
+		//if (length == -1) {
+		//	length = parentAccessorLength - startAddr;
+		//}
 
-		if (length == -1)
-			length = parentAccessorLength - startOffset;
+		//return DataAccessorPtr(new CopyAccessor(m_parentAccessor, startAddr - parentAccessorAddr, length));
+		return m_parentAccessor->externalCopy (startAddr, length);
+	}
 
-		if (parentAccessorLength - startOffset < length)
-			throw DbgException("copy accessor range error");
-
-		return DataAccessorPtr(new CopyAccessor(m_parentAccessor, startOffset, length));
+	virtual bool checkRange(MEMOFFSET_64 startAddr, size_t length) const
+	{
+		return isRangeInside(m_pos, m_length, startAddr, length);
 	}
 
 private:
@@ -1261,9 +1280,14 @@ private:
         return DataAccessorPtr( new CopyAccessor( shared_from_this(), startOffset, length) );
     }
 
-	DataAccessorPtr externalCopy(size_t startOffset = 0, size_t length = -1) final
+	DataAccessorPtr externalCopy(MEMOFFSET_64 startAddr = 0, size_t length = -1) final
 	{
-		return DataAccessorPtr(new CopyAccessor(shared_from_this(), startOffset, length));
+		return DataAccessorPtr(new CopyAccessor(shared_from_this(), startAddr, length));
+	}
+
+	virtual bool checkRange(MEMOFFSET_64 startAddr, size_t length) const
+	{
+		return isRangeInside(0, m_buffer.size(), startAddr, length);
 	}
 
 private:
@@ -1918,12 +1942,36 @@ private:
 
 	DataAccessorPtr nestedCopy(size_t startOffset = 0, size_t length = -1) final
 	{
-		return DataAccessorPtr(new CopyAccessor(shared_from_this(), startOffset, length));
+		if (length == -1) {
+			length = m_buffer.size() - startOffset;
+		}
+		MEMOFFSET_64 startAddr = m_addr + startOffset;
+		if (!checkRange(startAddr, length)) {
+			throw DbgException("dump accessor range error");
+		}
+		return DataAccessorPtr(new CopyAccessor(shared_from_this(), startAddr, length));
 	}
 
-	DataAccessorPtr externalCopy(size_t startOffset = 0, size_t length = -1) final
+	DataAccessorPtr externalCopy(MEMOFFSET_64 startAddr = 0, size_t length = -1) final
 	{
-		return DataAccessorPtr(new CopyAccessor(shared_from_this(), startOffset, length));
+		if (startAddr < m_addr) {
+			throw DbgException("dump accessor startAddr error: %p < %p ", startAddr, m_addr);
+		}
+		size_t startOffset = startAddr - m_addr;
+		if (length == -1) {
+			length = m_buffer.size() - startOffset;
+		}
+
+		if (!checkRange(startAddr, length)) {
+			throw DbgException("dump accessor range error");
+		}
+		
+		return DataAccessorPtr(new CopyAccessor(shared_from_this(), startAddr, length));
+	}
+
+	virtual bool checkRange(MEMOFFSET_64 startAddr, size_t length) const
+	{
+		return isRangeInside(m_addr, m_buffer.size(), startAddr, length);
 	}
 
 private:
@@ -1934,38 +1982,47 @@ private:
 
 	std::wstring  m_location;
 
-	bool CheckRange (size_t offset, size_t size) const {
+	//bool CheckRange (MEMOFFSET_64 startAddr, size_t length) const {
 
-		size_t curDumpSize = m_buffer.size();
-	
-		if (offset < m_addr ||
-			offset >= m_addr + curDumpSize ||
-			offset + size > m_addr + curDumpSize
-			) {
-			return false;
-		}
+	//	size_t curDumpSize = m_buffer.size();
+	//	size_t startOffset = startAddr - m_addr;
+	//
+	//	if (startAddr > m_addr || 
+	//		startOffset >= curDumpSize ||
+	//		startOffset + length > curDumpSize
+	//		) {
+	//		return false;
+	//	}
 
-		return true;
+	//	return true;
+	//}
+
+	size_t addrToOffset(MEMOFFSET_64 startAddr) const {
+		return startAddr - m_addr;
 	}
 
 	template <typename T>
-	T getValue(size_t pos) const
+	T getValue(MEMOFFSET_64 startAddress) const
 	{
-		if (!CheckRange (pos, sizeof(T))) {
+		if (!checkRange (startAddress, sizeof(T))) {
 			throw DbgException("dump accessor range error");
 		}
 
-		return *reinterpret_cast<const T*>(&m_buffer[pos - m_addr]);
+		size_t startOffset = addrToOffset(startAddress);
+
+		return *reinterpret_cast<const T*>(&m_buffer[startOffset]);
 	}
 
 	template <typename T>
-	void setValue(T value, size_t pos)
+	void setValue(T value, MEMOFFSET_64 startAddress)
 	{
-		if (!CheckRange(pos, sizeof(T))) {
+		if (!checkRange(startAddress, sizeof(T))) {
 			throw DbgException("dump accessor range error");
 		}
 
-		*reinterpret_cast<T*>(&m_buffer[pos - m_addr]) = value;
+		size_t startOffset = addrToOffset(startAddress);
+
+		*reinterpret_cast<T*>(&m_buffer[startOffset]) = value;
 	}
 
 	template <typename T>
@@ -1976,25 +2033,29 @@ private:
 	}
 
 	template <typename T>
-	void readValues(std::vector<T>& dataRange, size_t count, size_t pos) const
+	void readValues(std::vector<T>& dataRange, size_t count, MEMOFFSET_64 startAddress) const
 	{
-		if (!CheckRange(pos, count * sizeof(T))) {
+		if (!checkRange(startAddress, count * sizeof(T))) {
 			throw DbgException("dump accessor range error");
 		}
 
+		size_t startOffset = addrToOffset(startAddress);
+
 		dataRange = std::vector<T>(
-			reinterpret_cast<const T*>(&m_buffer[pos - m_addr]),
-			reinterpret_cast<const T*>(&m_buffer[pos - m_addr]) + count);
+			reinterpret_cast<const T*>(&m_buffer[startOffset]),
+			reinterpret_cast<const T*>(&m_buffer[startOffset]) + count);
 	}
 
 	template <typename T>
-	void writeValues(const std::vector<T>&  dataRange, size_t pos)
+	void writeValues(const std::vector<T>&  dataRange, MEMOFFSET_64 startAddress)
 	{
-		if (!CheckRange(pos, dataRange.size() * sizeof(T))) {
+		if (!checkRange(startAddress, dataRange.size() * sizeof(T))) {
 			throw DbgException("dump accessor range error");
 		}
 
-		memcpy(&m_buffer[pos - m_addr], &dataRange[0], dataRange.size() * sizeof(T));
+		size_t startOffset = addrToOffset(startAddress);
+
+		memcpy(&m_buffer[startOffset], &dataRange[0], dataRange.size() * sizeof(T));
 	}
 };
 
